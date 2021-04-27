@@ -1,7 +1,8 @@
+import pickle
+
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
-import pickle
 
 import figure_config
 
@@ -9,7 +10,11 @@ mpl.rcParams.update(figure_config.mpl_style)
 
 
 def gaussian_density(x, mu, sigma):
-    return 1. / np.sqrt(2. * np.pi * sigma ** 2) * np.exp(-(x - mu) ** 2 / (2. * sigma ** 2))
+    return (
+        1.0
+        / np.sqrt(2.0 * np.pi * sigma ** 2)
+        * np.exp(-((x - mu) ** 2) / (2.0 * sigma ** 2))
+    )
 
 
 def plot_rates(ax_early, ax_late):
@@ -73,13 +78,13 @@ def plot_potential(ax_early, ax_late):
         times[indices_times_before],
         res["u0_sample"][indices_times_before],
         color=figure_config.colors["VT"],
-        ls=':',
+        ls=":",
     )
     ax_early.plot(
         times[indices_times_early],
         res["u0_sample"][indices_times_early],
         color=figure_config.colors["VT"],
-        ls='--',
+        ls="--",
     )
 
     ax_early.axvline(0.0, color="k", ls="--")
@@ -147,49 +152,50 @@ def plot_dist(ax):
 
 
 def plot_cond(ax_early, ax_late, ax_rel):
-    ax_early.set_ylabel(r"$W_d^\mathsf{E}+W_d^\mathsf{I}$", fontsize=figure_config.fontsize_tiny)
+    ax_early.set_ylabel(
+        r"$W_d^\mathsf{E}+W_d^\mathsf{I}$", fontsize=figure_config.fontsize_tiny
+    )
     ax_early.set_xlim(xlim_early)
-    ax_early.set_ylim(plot_params["ylim_cond"])
+    ax_early.set_ylim(plot_params["ylim_weights"])
     ax_early.set_xticklabels([])
 
     ax_late.set_xticklabels([])
     ax_late.set_yticks([])
     ax_late.spines["left"].set_visible(False)
-    ax_late.set_ylim(plot_params["ylim_cond"])
+    ax_late.set_ylim(plot_params["ylim_weights"])
 
-    ax_rel.set_xlabel('Time (s)', fontsize=figure_config.fontsize_tiny)
-    ax_rel.set_ylabel('Rel. weight.', fontsize=figure_config.fontsize_tiny)
-    ax_rel.set_ylim(0., 1.)
+    ax_rel.set_xlabel("Time (s)", fontsize=figure_config.fontsize_tiny)
+    ax_rel.set_ylabel("Rel. weight.", fontsize=figure_config.fontsize_tiny)
+    ax_rel.set_ylim(0.0, 1.0)
 
     wd = res["wEd"] + res["wId"]
     ax_early.plot(
-        times[indices_times_start], wd[:, 0][indices_times_start], color=figure_config.colors["V"],
+        times[indices_times_start],
+        wd[:, 0][indices_times_start],
+        color=figure_config.colors["V"],
     )
     ax_early.plot(
-        times[indices_times_start], wd[:, 1][indices_times_start], color=figure_config.colors["T"],
+        times[indices_times_start],
+        wd[:, 1][indices_times_start],
+        color=figure_config.colors["T"],
     )
 
     ax_late.plot(
-        times[indices_times_late], wd[:, 0][indices_times_late], color=figure_config.colors["V"],
+        times[indices_times_late],
+        wd[:, 0][indices_times_late],
+        color=figure_config.colors["V"],
     )
     ax_late.plot(
-        times[indices_times_late], wd[:, 1][indices_times_late], color=figure_config.colors["T"],
+        times[indices_times_late],
+        wd[:, 1][indices_times_late],
+        color=figure_config.colors["T"],
     )
 
-    rel_sigma = (
-        1.0
-        / params["sigma_0"] ** 2
-        / (1.0 / params["sigma_0"] ** 2 + 1.0 / params["sigma_1"] ** 2)
-    )
     wd0_rel = wd[:, 0] / (wd[:, 0] + wd[:, 1])
     wd1_rel = wd[:, 1] / (wd[:, 0] + wd[:, 1])
-    print(wd0_rel[0], "->", wd0_rel[-1], "<->", rel_sigma)
-    ax_rel.plot(
-        times, wd0_rel, ls="-", color=figure_config.colors["V"]
-    )
-    ax_rel.plot(
-        times, wd1_rel, ls="-",  color=figure_config.colors["T"]
-    )
+
+    ax_rel.plot(times, wd0_rel, ls="-", color=figure_config.colors["V"])
+    ax_rel.plot(times, wd1_rel, ls="-", color=figure_config.colors["T"])
 
 
 if __name__ == "__main__":
@@ -204,14 +210,14 @@ if __name__ == "__main__":
         "t_early": (0.0, 5.0),
         "t_late": None,
         "ylim_potential": (-85.0, -52.0),
-        "ylim_cond": (0.0, 1.5),
+        "ylim_weights": (0.0, .5),
         "ylim_rate": (0.0, 3.5),
     }
 
     with open(f"res_{sigma}.pkl", "rb") as f:
         res = pickle.load(f)
 
-    fig = plt.figure(figsize=(5., 2.5))
+    fig = plt.figure(figsize=(5.0, 2.5))
 
     x_early = 0.12
     width_early = 0.38
@@ -229,15 +235,14 @@ if __name__ == "__main__":
 
     step_size = 1
     window_size = 5
-    times = np.arange(
+    trials = np.arange(
         -params["relative_time_silent_teacher"] * params["trials"],
         (1.0 - params["relative_time_silent_teacher"]) * params["trials"],
         params["recording_interval"],
     )
-    alpha = 0.65
 
     # convert trial indices to time
-    times *= 100.0 / params["recording_interval"]  # 1 trial == 100 ms
+    times = trials * 10.0
     times *= 1e-3  # ms to s
 
     plot_params["t_late"] = (times[-1] - 3.5, times[-1])
@@ -262,7 +267,6 @@ if __name__ == "__main__":
     plot_dist(ax_dist)
     plot_cond(ax_cond_early, ax_cond_late, ax_cond_rel)
 
-    figname = "learning.{ext}"
+    figname = "learning.pdf"
     print(f"creating {figname}")
-    plt.savefig(figname.format(ext="svg"))
-    plt.savefig(figname.format(ext="pdf"), dpi=300)
+    plt.savefig(figname, dpi=300)

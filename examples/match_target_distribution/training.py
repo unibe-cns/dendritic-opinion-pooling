@@ -1,6 +1,7 @@
-import numpy as np
 import os
 import pickle
+
+import numpy as np
 import torch
 
 from dopp import FeedForwardCell
@@ -82,25 +83,25 @@ def train(params, model, model_target, *, manual_grad=False):
         if i % params["recording_interval"] == 0:
             idx = i // params["recording_interval"]
 
-            res["r_in"][idx] = r_in[0]
-            res["r_in_noisy"][idx] = r_in_noisy[0]
+            res["r_in"][idx] = r_in[0].detach()
+            res["r_in_noisy"][idx] = r_in_noisy[0].detach()
             if i > params["relative_time_silent_teacher"] * params["trials"]:
-                res["g0_target"][idx] = g0_target.clone()
-                res["u0_target"][idx] = u0_target.clone()
-                res["u0_target_sample"][idx] = u0_target_sample
+                res["g0_target"][idx] = g0_target.clone().detach()
+                res["u0_target"][idx] = u0_target.clone().detach()
+                res["u0_target_sample"][idx] = u0_target_sample.detach()
             else:
                 res["g0_target"][idx] = 0.0
                 res["u0_target"][idx] = -70.0
                 res["u0_target_sample"][idx] = -70.0
 
             g0, u0 = model(u_in)
-            res["g0"][idx] = g0
-            res["u0"][idx] = u0
-            res["u0_sample"][idx] = model.sample(g0, u0)[0]
+            res["g0"][idx] = g0.detach()
+            res["u0"][idx] = u0.detach()
+            res["u0_sample"][idx] = model.sample(g0, u0)[0].detach()
 
             for d in range(model.n_dendrites):
-                res["wEd"][idx, d] = model.weightsE(d).clone()
-                res["wId"][idx, d] = model.weightsI(d).clone()
+                res["wEd"][idx, d] = model.weightsE(d).clone().detach()
+                res["wId"][idx, d] = model.weightsI(d).clone().detach()
 
         if (i + 1) % params["check_point_interval"] == 0:
             torch.save(
@@ -119,50 +120,52 @@ if __name__ == "__main__":
 
     params = {
         "seed": 1234,
-        # "trials": 2_000_000,
-        "trials": 200_000,
+        "trials": 110_000,
         "relative_time_silent_teacher": 0.05,
-        "recording_interval": 100,
+        "recording_interval": 10,
         "check_point_interval": 10_000,
-        "lr": 0.025e-2,
+        "lr": 1.25e-3,
         "n_dendrites": 2,
         "r_mu": 1.2,
-        "r_sigma": 0.5 * 1e0,
-        "sigma_0": 0.05 * 7.5e-1,
-        "sigma_1": 0.25 * 7.5e-1,
         "save_path": "./",
+        "r_sigma": 0.5,
+        "sigma_0": 0.01875,
+        "sigma_1": 0.3,
+        "gL0": 0.25,
+        "gLd": 0.025,
     }
 
     np.random.seed(params["seed"])
     torch.manual_seed(params["seed"])
 
-    scale_factor = 5.0
-
-    gL = scale_factor * 0.05
-
     model_target = FeedForwardCell([1], 1)
     model_target.gc = None
-    model_target.gL0 = gL
-    model_target.gLd = torch.ones(1) * 0.1 * gL
-    model_target.scale_weightsE(scale_factor * 2.5)
-    model_target.scale_weightsI(scale_factor * 3.5)
+    model_target.gL0 = params["gL0"]
+    model_target.gLd = torch.ones(1) * params["gLd"]
+    model_target.scale_weightsE(25.0)
+    model_target.scale_weightsI(35.0)
 
     model = FeedForwardCell([1, 1], 1)
     model.gc = None
-    model.gL0 = gL
-    model.gLd = torch.ones(params["n_dendrites"]) * 0.1 * gL
-    model.scale_weightsE(0.8 * scale_factor * 2.5)
-    model.scale_weightsI(0.8 * scale_factor * 3.5)
+    model.gL0 = params["gL0"]
+    model.gLd = torch.ones(params["n_dendrites"]) * params["gLd"]
+    model.scale_weightsE(0.45)
+    model.scale_weightsI(1.05)
 
     # start both modalities with comparable initial weights
     model.set_weightsE(1, 1.01 * model.weightsE(0))
     model.set_weightsI(1, 0.99 * model.weightsI(0))
 
     torch.manual_seed(params["seed"])
-    res = train(params, model, model_target, manual_grad=True)
+    with torch.no_grad():
+        res = train(params, model, model_target, manual_grad=True)
 
-    with open(os.path.join(params["save_path"], f"params_{params['r_sigma']}.pkl"), "wb") as f:
+    with open(
+        os.path.join(params["save_path"], f"params_{params['r_sigma']}.pkl"), "wb"
+    ) as f:
         pickle.dump(params, f)
 
-    with open(os.path.join(params["save_path"], f"res_{params['r_sigma']}.pkl"), "wb") as f:
+    with open(
+        os.path.join(params["save_path"], f"res_{params['r_sigma']}.pkl"), "wb"
+    ) as f:
         pickle.dump(res, f)
